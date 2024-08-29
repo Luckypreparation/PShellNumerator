@@ -1,0 +1,123 @@
+# Output file path
+$outputFile = "$env:USERPROFILE\Desktop\ComprehensiveModuleEnumeration.txt"
+
+# List of critical modules
+$criticalModules = @(
+    "Microsoft.PowerShell.Security",
+    "PKI",
+    "Microsoft.WSMan.Management",
+    "NetSecurity",
+    "NetTCPIP",
+    "Microsoft.PowerShell.Diagnostics",
+    "PSDiagnostics",
+    "Microsoft.PowerShell.Core",
+    "Microsoft.PowerShell.Utility",
+    "CimCmdlets",
+    "Microsoft.PowerShell.Management",
+    "Microsoft.PowerShell.LocalAccounts",
+    "NetAdapter",
+    "NetConnection",
+    "ScheduledTasks",
+    "SmbShare",
+    "Storage",
+    "Defender",
+    "ProcessMitigations",
+    "AppLocker",
+    "BitLocker",
+    "TrustedPlatformModule",
+    "AuditPolicyDsc",
+    "PSDscResources",
+    "PSDesiredStateConfiguration"
+)
+
+# Function to get all commands from a module
+function Get-ModuleCommands {
+    param($moduleName)
+    
+    try {
+        Import-Module $moduleName -ErrorAction Stop
+        $commands = Get-Command -Module $moduleName | Select-Object Name, CommandType
+        Remove-Module $moduleName -ErrorAction SilentlyContinue
+        return $commands
+    }
+    catch {
+        Write-Warning "Error processing module '$moduleName': $($_.Exception.Message)"
+        return $null
+    }
+}
+
+# Clear or create the output file
+Set-Content $outputFile "Comprehensive PowerShell Module and Command Enumeration`n`n"
+
+# Get all available modules
+$modules = Get-Module -ListAvailable
+
+# Enumerate critical modules first
+Add-Content $outputFile "CRITICAL MODULES`n=================="
+foreach ($criticalModule in $criticalModules) {
+    $module = $modules | Where-Object { $_.Name -eq $criticalModule }
+    if ($module) {
+        Add-Content $outputFile "Module: $($module.Name)"
+        Add-Content $outputFile "Path: $($module.Path)"
+        Add-Content $outputFile "Description: $(switch($module.Name) {
+            'Microsoft.PowerShell.Security' { 'Contains cmdlets for managing security features' }
+            'PKI' { 'Handles certificate management' }
+            'Microsoft.WSMan.Management' { 'Manages remote connections, which could be exploited if misconfigured' }
+            'NetSecurity' { 'Manages Windows Firewall and IPsec settings' }
+            'NetTCPIP' { 'Configures network settings, potentially exposing network vulnerabilities if misused' }
+            'Microsoft.PowerShell.Diagnostics' { 'Provides access to event logs and performance counters' }
+            'PSDiagnostics' { 'Enables/disables PowerShell diagnostics, which could be used to hide malicious activity' }
+            'Microsoft.PowerShell.Core' { 'Core PowerShell functionality, including execution policies' }
+            'Microsoft.PowerShell.Utility' { 'Contains versatile cmdlets that could be misused (e.g., Invoke-Expression)' }
+            'CimCmdlets' { 'Manages CIM/WMI operations, providing deep system access' }
+            'Microsoft.PowerShell.Management' { 'Manages various Windows components and could be used for persistence' }
+            'Microsoft.PowerShell.LocalAccounts' { 'Manages local users and groups' }
+            'NetAdapter' { 'Configures network adapters, potentially affecting connectivity' }
+            'NetConnection' { 'Manages network connections' }
+            'ScheduledTasks' { 'Manages scheduled tasks, which could be used for persistence' }
+            'SmbShare' { 'Manages file shares, which if misconfigured could lead to data exposure' }
+            'Storage' { 'Manages storage subsystems and could affect data integrity' }
+            'Defender' { 'Manages Windows Defender settings' }
+            'ProcessMitigations' { 'Configures process mitigation policies' }
+            'AppLocker' { 'Manages application control policies' }
+            'BitLocker' { 'Manages drive encryption' }
+            'TrustedPlatformModule' { 'Interfaces with the TPM for secure key storage' }
+            'AuditPolicyDsc' { 'Configures audit policies' }
+            'PSDscResources' { 'Manages system configurations' }
+            'PSDesiredStateConfiguration' { 'Applies and maintains system configurations' }
+            default { 'No description available' }
+        })"
+        Add-Content $outputFile "Commands:"
+        $commands = Get-ModuleCommands $module.Name
+        if ($commands) {
+            foreach ($command in $commands) {
+                Add-Content $outputFile "  - $($command.Name) ($($command.CommandType))"
+            }
+        } else {
+            Add-Content $outputFile "  No commands found or unable to import module."
+        }
+        Add-Content $outputFile "`n"
+    }
+}
+
+# Enumerate all other modules
+Add-Content $outputFile "`nALL MODULES`n============"
+foreach ($module in $modules) {
+    if ($module.Name -notin $criticalModules) {
+        Add-Content $outputFile "Module: $($module.Name)"
+        Add-Content $outputFile "Path: $($module.Path)"
+        Add-Content $outputFile "Commands:"
+        $commands = Get-ModuleCommands $module.Name
+        if ($commands) {
+            foreach ($command in $commands) {
+                Add-Content $outputFile "  - $($command.Name) ($($command.CommandType))"
+            }
+        } else {
+            Add-Content $outputFile "  No commands found or unable to import module."
+        }
+        Add-Content $outputFile "`n"
+    }
+}
+
+Add-Content $outputFile "Enumeration complete."
+Write-Host "Comprehensive enumeration complete. Results saved to $outputFile" -ForegroundColor Green
